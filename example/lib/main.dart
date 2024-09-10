@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
-
-import 'package:flutter/services.dart';
 import 'package:flutter_zendesk_sdk/flutter_zendesk_sdk.dart';
 
 void main() {
@@ -9,55 +6,174 @@ void main() {
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({super.key});
+  const MyApp({Key? key}) : super(key: key);
 
   @override
   State<MyApp> createState() => _MyAppState();
 }
 
 class _MyAppState extends State<MyApp> {
-  String _platformVersion = 'Unknown';
-  final _flutterZendeskSdkPlugin = FlutterZendeskSdk();
+  static const String androidChannelKey = "your android key";
+  static const String iosChannelKey = "your iOS key";
+
+  final List<String> channelMessages = [];
+
+  bool isLogin = false;
+  int unreadMessageCount = 0;
 
   @override
   void initState() {
     super.initState();
-    initPlatformState();
-  }
-
-  // Platform messages are asynchronous, so we initialize in an async method.
-  Future<void> initPlatformState() async {
-    String platformVersion;
-    // Platform messages may fail, so we use a try/catch PlatformException.
-    // We also handle the message potentially returning null.
-    try {
-      platformVersion =
-          await _flutterZendeskSdkPlugin.getPlatformVersion() ?? 'Unknown platform version';
-    } on PlatformException {
-      platformVersion = 'Failed to get platform version.';
-    }
-
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
-    if (!mounted) return;
-
-    setState(() {
-      _platformVersion = platformVersion;
+    // Optional, observe all incoming messages
+    FlutterZendeskSdk.setMessageHandler((type, arguments) {
+      setState(() {
+        channelMessages.add("$type - args=$arguments");
+      });
     });
   }
 
   @override
+  void dispose() {
+    FlutterZendeskSdk.invalidate();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final message = channelMessages.join("\n");
+
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(
-          title: const Text('Plugin example app'),
+          title: const Text('Zendesk Messaging Example'),
         ),
-        body: Center(
-          child: Text('Running on: $_platformVersion\n'),
+        body: SafeArea(
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            child: ListView(
+              children: [
+                Text(message),
+                const SizedBox(
+                  height: 20,
+                ),
+                ElevatedButton(
+                  onPressed: () => FlutterZendeskSdk.initialize(
+                    androidChannelKey: androidChannelKey,
+                    iosChannelKey: iosChannelKey,
+                  ),
+                  child: const Text("Initialize"),
+                ),
+                if (isLogin) ...[
+                  ElevatedButton(
+                    onPressed: () => FlutterZendeskSdk.show(),
+                    child: const Text("Show messaging"),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => _getUnreadMessageCount(),
+                    child:
+                        Text('Get unread message count - $unreadMessageCount'),
+                  ),
+                ],
+                ElevatedButton(
+                  onPressed: () => _setTags(),
+                  child: const Text("Add tags"),
+                ),
+                ElevatedButton(
+                  onPressed: () => _clearTags(),
+                  child: const Text("Clear tags"),
+                ),
+                ElevatedButton(
+                  onPressed: () => _login(),
+                  child: const Text("Login"),
+                ),
+                ElevatedButton(
+                  onPressed: () => _logout(),
+                  child: const Text("Logout"),
+                ),
+                ElevatedButton(
+                  onPressed: () => _checkUserLoggedIn(),
+                  child: const Text("Check LoggedIn"),
+                ),
+                ElevatedButton(
+                  onPressed: () => _setFields(),
+                  child: const Text("Add Fields"),
+                ),
+                ElevatedButton(
+                  onPressed: () => _clearFields(),
+                  child: const Text("Clear Fields"),
+                ),
+                ElevatedButton(
+                  onPressed: () => _show(),
+                  child: const Text("Show"),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
+  }
+
+  void _login() {
+    // You can attach local observer when calling some methods to be notified when ready
+    FlutterZendeskSdk.loginUserCallbacks(
+      jwt: "my_jwt",
+      onSuccess: (id, externalId) => setState(() {
+        channelMessages.add("Login observer - SUCCESS: $id, $externalId");
+        isLogin = true;
+      }),
+      onFailure: () => setState(() {
+        channelMessages.add("Login observer - FAILURE!");
+        isLogin = false;
+      }),
+    );
+  }
+
+  void _logout() {
+    FlutterZendeskSdk.logoutUser();
+    setState(() {
+      isLogin = false;
+    });
+  }
+
+  void _getUnreadMessageCount() async {
+    final messageCount = await FlutterZendeskSdk.getUnreadMessageCount();
+    if (mounted) {
+      unreadMessageCount = messageCount;
+      setState(() {});
+    }
+  }
+
+  void _setTags() async {
+    final tags = ['tag1', 'tag2', 'tag3'];
+    await FlutterZendeskSdk.setConversationTags(tags);
+  }
+
+  void _clearTags() async {
+    await FlutterZendeskSdk.clearConversationTags();
+  }
+
+  void _checkUserLoggedIn() async {
+    final isLoggedIn = await FlutterZendeskSdk.isLoggedIn();
+    setState(() {
+      channelMessages.add('User is ${isLoggedIn ? '' : 'not'} logged in');
+    });
+  }
+
+  void _setFields() async {
+    Map<String, String> fieldsMap = {};
+
+    fieldsMap["field1"] = "Value 1";
+    fieldsMap["field2"] = "Value 2";
+
+    await FlutterZendeskSdk.setConversationFields(fieldsMap);
+  }
+
+  void _clearFields() async {
+    await FlutterZendeskSdk.clearConversationFields();
+  }
+
+  void _show() {
+    FlutterZendeskSdk.show();
   }
 }
