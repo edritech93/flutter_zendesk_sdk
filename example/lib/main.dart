@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_zendesk_sdk/flutter_zendesk_sdk.dart';
 
-void main() {
+void main() async {
+  await dotenv.load(fileName: ".env");
   runApp(const MyApp());
 }
 
@@ -13,9 +15,6 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  static const String androidChannelKey = "your android key";
-  static const String iosChannelKey = "your iOS key";
-
   final List<String> channelMessages = [];
 
   bool isLogin = false;
@@ -58,8 +57,9 @@ class _MyAppState extends State<MyApp> {
                 ),
                 ElevatedButton(
                   onPressed: () => FlutterZendeskSdk.initialize(
-                    androidChannelKey: androidChannelKey,
-                    iosChannelKey: iosChannelKey,
+                    androidChannelKey:
+                        dotenv.get('ZENDESK_SDK_ANDROID', fallback: ''),
+                    iosChannelKey: dotenv.get('ZENDESK_SDK_IOS', fallback: ''),
                   ),
                   child: const Text("Initialize"),
                 ),
