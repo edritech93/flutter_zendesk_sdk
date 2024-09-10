@@ -24,6 +24,6 @@ abstract class FlutterZendeskSdkPlatform extends PlatformInterface {
   }
 
   Future<String?> getPlatformVersion() {
-    throw UnimplementedError('platformVersion() has not been implemented.');
+    return MethodChannelFlutterZendeskSdk().getPlatformVersion();
   }
 }
