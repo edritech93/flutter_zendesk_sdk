@@ -2,18 +2,121 @@ import Flutter
 import UIKit
 
 public class FlutterZendeskSdkPlugin: NSObject, FlutterPlugin {
-  public static func register(with registrar: FlutterPluginRegistrar) {
-    let channel = FlutterMethodChannel(name: "flutter_zendesk_sdk", binaryMessenger: registrar.messenger())
-    let instance = FlutterZendeskSdkPlugin()
-    registrar.addMethodCallDelegate(instance, channel: channel)
-  }
-
-  public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-    switch call.method {
-    case "getPlatformVersion":
-      result("iOS " + UIDevice.current.systemVersion)
-    default:
-      result(FlutterMethodNotImplemented)
+    let TAG = "[FlutterZendeskSdkPlugin]"
+    private var channel: FlutterMethodChannel
+    var isInitialized = false
+    var isLoggedIn = false
+    
+    init(channel: FlutterMethodChannel) {
+        self.channel = channel
     }
-  }
+    
+    public static func register(with registrar: FlutterPluginRegistrar) {
+        let channel = FlutterMethodChannel(name: "flutter_zendesk_sdk", binaryMessenger: registrar.messenger())
+        let instance = FlutterZendeskSdkPlugin(channel: channel)
+        registrar.addMethodCallDelegate(instance, channel: channel)
+    }
+    
+    public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        DispatchQueue.main.async {
+            self.processMethodCall(call, result: result)
+        }
+    }
+    
+    private func processMethodCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        let method = call.method
+        let arguments = call.arguments as? Dictionary<String, Any>
+        let zendeskMessaging = ZendeskMessaging(flutterPlugin: self, channel: channel)
+        
+        switch(method){
+        case "initialize":
+            if (isInitialized) {
+                print("\(TAG) - Messaging is already initialize!\n")
+                return
+            }
+            let channelKey: String = (arguments?["channelKey"] ?? "") as! String
+            zendeskMessaging.initialize(channelKey: channelKey)
+            break;
+        case "show":
+            if (!isInitialized) {
+                print("\(TAG) - Messaging needs to be initialized first.\n")
+            }
+            zendeskMessaging.show(rootViewController: UIApplication.shared.delegate?.window??.rootViewController)
+            break
+        case "loginUser":
+            if (!isInitialized) {
+                print("\(TAG) - Messaging needs to be initialized first.\n")
+            }
+            let jwt: String = arguments?["jwt"] as! String
+            zendeskMessaging.loginUser(jwt: jwt)
+            break
+        case "logoutUser":
+            if (!isInitialized) {
+                print("\(TAG) - Messaging needs to be initialized first.\n")
+            }
+            zendeskMessaging.logoutUser()
+            break
+        case "getUnreadMessageCount":
+            if (!isInitialized) {
+                print("\(TAG) - Messaging needs to be initialized first.\n")
+            }
+            result(handleMessageCount())
+            break
+            
+        case "isInitialized":
+            result(handleInitializedStatus())
+            break
+        case "isLoggedIn":
+            result(handleLoggedInStatus())
+            break
+            
+        case "setConversationTags":
+            if (!isInitialized) {
+                print("\(TAG) - Messaging needs to be initialized first.\n")
+            }
+            let tags: [String] = arguments?["tags"] as! [String]
+            zendeskMessaging.setConversationTags(tags:tags)
+            break
+        case "clearConversationTags":
+            if (!isInitialized) {
+                print("\(TAG) - Messaging needs to be initialized first.\n")
+            }
+            zendeskMessaging.clearConversationTags()
+            break
+        case "setConversationFields":
+            if (!isInitialized) {
+                print("\(TAG) - Messaging needs to be initialized first.\n")
+            }
+            let fields: [String: String] = arguments?["fields"] as! [String: String]
+            zendeskMessaging.setConversationFields(fields:fields)
+            break
+        case "clearConversationFields":
+            if (!isInitialized) {
+                print("\(TAG) - Messaging needs to be initialized first.\n")
+            }
+            zendeskMessaging.clearConversationFields()
+            break
+        case "invalidate":
+            if (!isInitialized) {
+                print("\(TAG) - Messaging is already on an invalid state\n")
+                return
+            }
+            zendeskMessaging.invalidate()
+            break
+        default:
+            result(FlutterMethodNotImplemented)
+        }
+    }
+    
+    private func handleMessageCount() ->Int{
+        let zendeskMessaging = ZendeskMessaging(flutterPlugin: self, channel: channel)
+        
+        return zendeskMessaging.getUnreadMessageCount()
+    }
+    private func handleInitializedStatus() ->Bool{
+        return isInitialized
+    }
+    private func handleLoggedInStatus() ->Bool{
+        return isLoggedIn
+    }
 }
